@@ -1,9 +1,15 @@
 package org.palladiosimulator.simulizar.interpreter;
 
+import java.io.Serializable;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 import org.palladiosimulator.pcm.core.composition.AssemblyContext;
 import org.palladiosimulator.pcm.core.entity.ResourceProvidedRole;
+import org.palladiosimulator.pcm.parameter.VariableUsage;
+import org.palladiosimulator.pcm.repository.Parameter;
 import org.palladiosimulator.pcm.resourceenvironment.ResourceContainer;
 import org.palladiosimulator.pcm.resourcetype.ResourceInterface;
 import org.palladiosimulator.pcm.resourcetype.ResourceRepository;
@@ -127,10 +133,26 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
                         Double.class, currentStackFrame));
         final String idRequiredResourceType = currentResourceType.getId();
 
+
         var rcEntity = allocationLookup.getAllocatedEntity(context.computeFQComponentID()
             .getFQIDString());
-        rcAccess.getSimulatedEntity(rcEntity.getId())
+        
+        Map<String, Serializable> parameterMap = new HashMap<String, Serializable>();
+        
+        for(final VariableUsage variableUsage : resourceCall.getInputVariableUsages__CallAction()) {
+            String value = variableUsage.getVariableCharacterisation_VariableUsage().get(0).getSpecification_VariableCharacterisation().getSpecification();
+            String key = variableUsage.getNamedReference__VariableUsage().getReferenceName();
+            parameterMap.put(key, value);
+        }
+        
+        if(parameterMap.isEmpty()) {
+            rcAccess.getSimulatedEntity(rcEntity.getId())
             .loadActiveResource(context.getThread(), resourceServiceId, idRequiredResourceType, evaluatedDemand);
+        } else {
+            rcAccess.getSimulatedEntity(rcEntity.getId())
+            .loadActiveResource(context.getThread(), resourceInterface.getId(), resourceServiceId, parameterMap, evaluatedDemand);
+        }
+        
         return InterpreterResult.OK;
     }
     
