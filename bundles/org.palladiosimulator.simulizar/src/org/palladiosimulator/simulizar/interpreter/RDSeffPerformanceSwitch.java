@@ -1,13 +1,15 @@
 package org.palladiosimulator.simulizar.interpreter;
 
 import java.io.Serializable;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import org.palladiosimulator.pcm.core.composition.AssemblyContext;
 import org.palladiosimulator.pcm.core.entity.ResourceProvidedRole;
+import org.palladiosimulator.pcm.parameter.VariableCharacterisation;
 import org.palladiosimulator.pcm.parameter.VariableUsage;
 import org.palladiosimulator.pcm.repository.Parameter;
 import org.palladiosimulator.pcm.resourceenvironment.ResourceContainer;
@@ -38,6 +40,7 @@ import de.uka.ipd.sdq.simucomframework.resources.IAssemblyAllocationLookup;
 import de.uka.ipd.sdq.simucomframework.resources.ISimulatedModelEntityAccess;
 import de.uka.ipd.sdq.simucomframework.variables.StackContext;
 import de.uka.ipd.sdq.simucomframework.variables.converter.NumberConverter;
+import de.uka.ipd.sdq.simucomframework.variables.exceptions.FunctionParametersNotAcceptedException;
 import de.uka.ipd.sdq.simucomframework.variables.stackframe.SimulatedStackframe;
 
 public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterResult> {
@@ -137,12 +140,31 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
         var rcEntity = allocationLookup.getAllocatedEntity(context.computeFQComponentID()
             .getFQIDString());
         
-        Map<String, Serializable> parameterMap = new HashMap<String, Serializable>();
+        // Search the parameters required by the signature and throw an Exception if they are missing.
+        List<String> parameters = new ArrayList<String>();
+        for (final Parameter parameter : resourceSignature.getParameter__ResourceSignature()) {
+            parameters.add(parameter.getParameterName());
+        }
         
-        for(final VariableUsage variableUsage : resourceCall.getInputVariableUsages__CallAction()) {
-            String value = variableUsage.getVariableCharacterisation_VariableUsage().get(0).getSpecification_VariableCharacterisation().getSpecification();
+        Map<String, Serializable> parameterMap = new HashMap<String, Serializable>();
+        for (final VariableUsage variableUsage : resourceCall.getInputVariableUsages__CallAction()) {
+            String value = context.evaluate(variableUsage.getVariableCharacterisation_VariableUsage().get(0).getSpecification_VariableCharacterisation().getSpecification()).toString();
             String key = variableUsage.getNamedReference__VariableUsage().getReferenceName();
-            parameterMap.put(key, value);
+            if (parameters.contains(key)) {
+                parameterMap.put(key, value);
+                parameters.remove(key);
+            } else {
+                // TODO: Should just be printed out once, so not here
+                //System.out.println("The parameter [" + key + ", " + value + "] in the resource call " + getResourceCallDescritpion(resourceCall) + " is not requested by the signature " + getResourceSignatureDescritpion(resourceSignature) + "and will be ignored.");
+            }
+        }
+        
+        if (!parameters.isEmpty()) {
+            String missingParameters = "";
+            for (String parameter : parameters) {
+                missingParameters += parameter + ", ";
+            }
+            throw new FunctionParametersNotAcceptedException("Parameters missing for resource call " + getResourceCallDescritpion(resourceCall) + ": " + missingParameters);
         }
         
         if(parameterMap.isEmpty()) {
@@ -154,6 +176,14 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
         }
         
         return InterpreterResult.OK;
+    }
+    
+    private String getResourceCallDescritpion(ResourceCall resourceCall) {
+        return "[" + resourceCall.getEntityName() + ", " + resourceCall.getId() + "]";
+    }
+    
+    private String getResourceSignatureDescritpion(ResourceSignature resourceSignature) {
+        return "[" + resourceSignature.getEntityName() + ", " + resourceSignature.getId() + "]";
     }
     
     @Override
