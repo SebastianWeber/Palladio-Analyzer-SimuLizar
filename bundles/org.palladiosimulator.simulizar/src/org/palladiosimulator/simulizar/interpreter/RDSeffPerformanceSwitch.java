@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.apache.log4j.Logger;
 import org.palladiosimulator.pcm.core.composition.AssemblyContext;
 import org.palladiosimulator.pcm.core.entity.ResourceProvidedRole;
-import org.palladiosimulator.pcm.parameter.VariableCharacterisation;
 import org.palladiosimulator.pcm.parameter.VariableUsage;
 import org.palladiosimulator.pcm.repository.Parameter;
 import org.palladiosimulator.pcm.resourceenvironment.ResourceContainer;
@@ -40,10 +40,12 @@ import de.uka.ipd.sdq.simucomframework.resources.IAssemblyAllocationLookup;
 import de.uka.ipd.sdq.simucomframework.resources.ISimulatedModelEntityAccess;
 import de.uka.ipd.sdq.simucomframework.variables.StackContext;
 import de.uka.ipd.sdq.simucomframework.variables.converter.NumberConverter;
-import de.uka.ipd.sdq.simucomframework.variables.exceptions.FunctionParametersNotAcceptedException;
 import de.uka.ipd.sdq.simucomframework.variables.stackframe.SimulatedStackframe;
 
 public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterResult> {
+    
+    protected static final Logger LOGGER = org.apache.log4j.Logger.getLogger(RDSeffPerformanceSwitch.class);
+    
     @AssistedFactory
     public interface Factory extends RDSeffSwitchContributionFactory {
         @Override
@@ -154,17 +156,16 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
                 parameterMap.put(key, value);
                 parameters.remove(key);
             } else {
-                // TODO: Should just be printed out once, so not here
-                //System.out.println("The parameter [" + key + ", " + value + "] in the resource call " + getResourceCallDescritpion(resourceCall) + " is not requested by the signature " + getResourceSignatureDescritpion(resourceSignature) + "and will be ignored.");
+                LOGGER.warn("The parameter [" + key + ", " + value + "] in the resource call " + getResourceCallDescritpion(resourceCall) + " is not requested by the signature " + getResourceSignatureDescritpion(resourceSignature) + " and will be ignored.");
             }
         }
-        
+
         if (!parameters.isEmpty()) {
             String missingParameters = "";
             for (String parameter : parameters) {
                 missingParameters += parameter + ", ";
             }
-            throw new FunctionParametersNotAcceptedException("Parameters missing for resource call " + getResourceCallDescritpion(resourceCall) + ": " + missingParameters);
+            LOGGER.warn("Parameters missing for resource call " + getResourceCallDescritpion(resourceCall) + ": " + missingParameters);
         }
         
         if(parameterMap.isEmpty()) {
