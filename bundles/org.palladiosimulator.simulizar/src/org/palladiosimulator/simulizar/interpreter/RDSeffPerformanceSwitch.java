@@ -142,12 +142,14 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
         var rcEntity = allocationLookup.getAllocatedEntity(context.computeFQComponentID()
             .getFQIDString());
         
-        // Search the parameters required by the signature and throw an Exception if they are missing.
+        // Get the parameters required by the signature
         List<String> parameters = new ArrayList<String>();
         for (final Parameter parameter : resourceSignature.getParameter__ResourceSignature()) {
             parameters.add(parameter.getParameterName());
         }
         
+        // Check wether the parameters of the signature are given
+        // Warn if too many parameters were given
         Map<String, Serializable> parameterMap = new HashMap<String, Serializable>();
         for (final VariableUsage variableUsage : resourceCall.getInputVariableUsages__CallAction()) {
             String value = context.evaluate(variableUsage.getVariableCharacterisation_VariableUsage().get(0).getSpecification_VariableCharacterisation().getSpecification()).toString();
@@ -160,6 +162,7 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
             }
         }
 
+        // Warn if parameters are missing
         if (!parameters.isEmpty()) {
             String missingParameters = "";
             for (String parameter : parameters) {
@@ -168,6 +171,9 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
             LOGGER.warn("Parameters missing for resource call " + getResourceCallDescritpion(resourceCall) + ": " + missingParameters);
         }
         
+        // if no parameters were given or 
+        // the signature requires none call without a map, 
+        // else with it
         if(parameterMap.isEmpty()) {
             rcAccess.getSimulatedEntity(rcEntity.getId())
             .loadActiveResource(context.getThread(), resourceServiceId, idRequiredResourceType, evaluatedDemand);
