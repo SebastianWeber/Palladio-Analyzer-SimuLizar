@@ -110,6 +110,8 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
         return result;
     }
     
+    private static List<String> loggedWarnings = new ArrayList<String>();
+    
     @Override
     public InterpreterResult caseResourceCall(ResourceCall resourceCall) {
         // find the corresponding resource type which was invoked by the resource call
@@ -137,7 +139,7 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
                 StackContext.evaluateStatic(resourceCall.getNumberOfCalls__ResourceCall().getSpecification(),
                         Double.class, currentStackFrame));
         final String idRequiredResourceType = currentResourceType.getId();
-
+        
 
         var rcEntity = allocationLookup.getAllocatedEntity(context.computeFQComponentID()
             .getFQIDString());
@@ -148,18 +150,14 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
             parameters.add(parameter.getParameterName());
         }
         
-        // Check wether the parameters of the signature are given
-        // Warn if too many parameters were given
+        // Check whether the parameters of the signature are given
+        // Copy the parameters in the parameter map
         Map<String, Serializable> parameterMap = new HashMap<String, Serializable>();
         for (final VariableUsage variableUsage : resourceCall.getInputVariableUsages__CallAction()) {
             String value = context.evaluate(variableUsage.getVariableCharacterisation_VariableUsage().get(0).getSpecification_VariableCharacterisation().getSpecification()).toString();
             String key = variableUsage.getNamedReference__VariableUsage().getReferenceName();
-            if (parameters.contains(key)) {
-                parameterMap.put(key, value);
-                parameters.remove(key);
-            } else {
-                LOGGER.warn("The parameter [" + key + ", " + value + "] in the resource call " + getResourceCallDescritpion(resourceCall) + " is not requested by the signature " + getResourceSignatureDescritpion(resourceSignature) + " and will be ignored.");
-            }
+            parameterMap.put(key, value);
+            parameters.remove(key);
         }
 
         // Warn if parameters are missing
@@ -168,16 +166,23 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
             for (String parameter : parameters) {
                 missingParameters += parameter + ", ";
             }
-            LOGGER.warn("Parameters missing for resource call " + getResourceCallDescritpion(resourceCall) + ": " + missingParameters);
+
+            String warning = "Parameters missing for resource call " + getResourceCallDescritpion(resourceCall) + ": " + missingParameters;
+            if (!loggedWarnings.contains(warning)) {
+                loggedWarnings.add(warning);
+                LOGGER.warn(warning);
+            }
+            
         }
         
         // if no parameters were given or 
         // the signature requires none call without a map, 
-        // else with it
+        // else with it and add additional parameters
         if(parameterMap.isEmpty()) {
             rcAccess.getSimulatedEntity(rcEntity.getId())
             .loadActiveResource(context.getThread(), resourceServiceId, idRequiredResourceType, evaluatedDemand);
         } else {
+            parameterMap.putAll(getAdditionalParameters(rcEntity));
             rcAccess.getSimulatedEntity(rcEntity.getId())
             .loadActiveResource(context.getThread(), resourceInterface.getId(), resourceServiceId, parameterMap, evaluatedDemand);
         }
@@ -185,12 +190,15 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
         return InterpreterResult.OK;
     }
     
-    private String getResourceCallDescritpion(ResourceCall resourceCall) {
-        return "[" + resourceCall.getEntityName() + ", " + resourceCall.getId() + "]";
+    // Add additional parameters to the map to be able to distinguish them in the scheduler
+    private Map<String, Serializable> getAdditionalParameters(EntityReference<?> rcEntity) {
+        Map<String, Serializable> parameterMap = new HashMap<String, Serializable>();
+        parameterMap.put("containerID", rcAccess.getSimulatedEntity(rcEntity.getId()).getResourceContainerID());
+        return parameterMap;
     }
     
-    private String getResourceSignatureDescritpion(ResourceSignature resourceSignature) {
-        return "[" + resourceSignature.getEntityName() + ", " + resourceSignature.getId() + "]";
+    private String getResourceCallDescritpion(ResourceCall resourceCall) {
+        return "[" + resourceCall.getEntityName() + ", " + resourceCall.getId() + "]";
     }
     
     @Override
