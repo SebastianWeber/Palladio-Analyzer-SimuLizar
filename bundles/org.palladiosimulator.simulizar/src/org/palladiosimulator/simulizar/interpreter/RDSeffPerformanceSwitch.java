@@ -177,24 +177,16 @@ public class RDSeffPerformanceSwitch extends SeffPerformanceSwitch<InterpreterRe
         
         // if no parameters were given or 
         // the signature requires none call without a map, 
-        // else with it and add additional parameters
+        // else with it
         if(parameterMap.isEmpty()) {
             rcAccess.getSimulatedEntity(rcEntity.getId())
             .loadActiveResource(context.getThread(), resourceServiceId, idRequiredResourceType, evaluatedDemand);
         } else {
-            parameterMap.putAll(getAdditionalParameters(rcEntity));
             rcAccess.getSimulatedEntity(rcEntity.getId())
             .loadActiveResource(context.getThread(), resourceInterface.getId(), resourceServiceId, parameterMap, evaluatedDemand);
         }
         
         return InterpreterResult.OK;
-    }
-    
-    // Add additional parameters to the map to be able to distinguish them in the scheduler
-    private Map<String, Serializable> getAdditionalParameters(EntityReference<?> rcEntity) {
-        Map<String, Serializable> parameterMap = new HashMap<String, Serializable>();
-        parameterMap.put("containerID", rcAccess.getSimulatedEntity(rcEntity.getId()).getResourceContainerID());
-        return parameterMap;
     }
     
     private String getResourceCallDescritpion(ResourceCall resourceCall) {
